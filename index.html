@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FD Centro de Gestión Comercial — Grupo Docuprint</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --red: #C00000; --dk: #16181B; --blue: #1F4E79; --green: #065F46;
+  --bg: #F8F9FA; --card: #FFFFFF; --border: #E5E7EB; --muted: #6B7280;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:var(--font); background:var(--bg); color:var(--dk); font-size:13px; }
+.container { max-width:1200px; margin:0 auto; padding:12px; }
+.header { background:linear-gradient(135deg,#C00000,#8B0000); color:#fff; padding:18px 24px; border-radius:12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; }
+.header h1 { font-size:20px; font-weight:800; }
+.header .sub { font-size:11px; opacity:.8; margin-top:4px; }
+.header .date { font-size:11px; opacity:.85; text-align:right; }
+.tabs { display:flex; gap:4px; margin-bottom:14px; flex-wrap:wrap; }
+.tab { padding:7px 16px; border:none; border-radius:6px; cursor:pointer; font-weight:600; font-size:12px; background:#F3F4F6; color:#374151; transition:.2s; }
+.tab.active { background:var(--red); color:#fff; }
+.tab:hover { opacity:.85; }
+.filters { display:flex; gap:4px; margin-bottom:10px; flex-wrap:wrap; }
+.fbtn { padding:4px 10px; border:1px solid var(--border); border-radius:5px; cursor:pointer; font-size:11px; background:#fff; color:#374151; }
+.fbtn.active { background:var(--dk); color:#fff; border-color:var(--dk); }
+.card { background:var(--card); border-radius:10px; border:1px solid var(--border); padding:16px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,.04); }
+.card-title { font-weight:700; font-size:14px; margin-bottom:10px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+.kpi { padding:12px; border-left:4px solid var(--dk); }
+.kpi .label { font-size:10px; color:var(--muted); font-weight:600; text-transform:uppercase; }
+.kpi .value { font-size:26px; font-weight:800; margin:2px 0; }
+table { width:100%; border-collapse:collapse; }
+th { text-align:left; padding:7px 8px; font-size:10px; font-weight:700; color:var(--muted); border-bottom:2px solid var(--border); text-transform:uppercase; letter-spacing:.4px; }
+td { padding:7px 8px; font-size:12px; border-bottom:1px solid #F3F4F6; }
+tr.alert-red { background:#FEF2F2; }
+tr.alert-yellow { background:#FFFBEB; }
+tr:hover { background:#F9FAFB; }
+.badge { padding:2px 7px; border-radius:4px; font-size:10px; font-weight:600; white-space:nowrap; display:inline-block; }
+.badge-dss { background:#FEE2E2; color:#991B1B; }
+.badge-mps { background:#DBEAFE; color:#1E40AF; }
+.badge-red { background:#FEE2E2; color:#991B1B; }
+.badge-amber { background:#FEF3C7; color:#92400E; }
+.badge-green { background:#D1FAE5; color:#065F46; }
+.badge-gray { background:#F3F4F6; color:#374151; }
+.badge-purple { background:#F3E8FF; color:#6B21A8; }
+.usd { color:var(--green); font-weight:600; }
+.comm-venta { color:var(--red); font-weight:700; }
+.comm-cobr { color:var(--blue); font-weight:600; }
+.total-row { background:#F9FAFB; font-weight:700; }
+.total-final { background:var(--dk); color:#fff; }
+.total-final td { color:#FCD34D; font-size:15px; font-weight:800; }
+.info-box { margin-top:10px; padding:10px; border-radius:6px; font-size:11px; }
+.info-blue { background:#EFF6FF; color:#1E40AF; }
+.info-red { background:#FEF2F2; color:#991B1B; }
+.loading { text-align:center; padding:40px; color:var(--muted); }
+.calc-row { display:flex; align-items:center; gap:8px; }
+.calc-input { padding:6px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; }
+.section { display:none; }
+.section.active { display:block; }
+.footer { text-align:center; padding:14px; font-size:10px; color:var(--muted); }
+@media(max-width:768px) { .kpis { grid-template-columns:1fr 1fr; } .container { padding:8px; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div>
+      <div style="font-size:9px;opacity:.7;letter-spacing:2px;text-transform:uppercase">Grupo Docuprint · DSS + MPS</div>
+      <h1>FD Centro de Gestión Comercial</h1>
+      <div class="sub">Fernando Daziano · Google Sheets → GitHub Pages</div>
+    </div>
+    <div class="date" id="todayDate"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showSection('dashboard')">Dashboard</button>
+    <button class="tab" onclick="showSection('contracts')">Contratos</button>
+    <button class="tab" onclick="showSection('commissions')">Comisiones</button>
+    <button class="tab" onclick="showSection('equipment')">Equipos</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" class="section active">
+    <div class="kpis" id="kpis"></div>
+    <div class="card">
+      <div class="card-title" style="color:var(--red)">⚠ Contratos próximos a vencer (180 días)</div>
+      <table><thead><tr><th>Cto.</th><th>Cliente</th><th></th><th>Vto.</th><th>Días</th><th>US$/Per.</th><th>Frec.</th></tr></thead>
+      <tbody id="alertsBody"></tbody></table>
+    </div>
+    <div class="card" id="summaryCard"></div>
+  </div>
+
+  <!-- CONTRACTS -->
+  <div id="contracts" class="section">
+    <div class="filters" id="contractFilters"></div>
+    <div class="card">
+      <table><thead><tr><th>Cto.</th><th>Cliente</th><th>Razón Social</th><th></th><th>Tipo Med.</th><th>Vto.</th><th>US$/Per.</th><th>Frec.</th><th>Meses</th><th>Copias B/N</th><th>Días</th></tr></thead>
+      <tbody id="contractsBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- COMMISSIONS -->
+  <div id="commissions" class="section">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title">Liquidación de Comisiones</div>
+        <div class="calc-row">
+          <label style="font-size:11px;font-weight:600;color:var(--muted)">PERÍODO:</label>
+          <input type="month" class="calc-input" id="commPeriod" onchange="renderCommissions()">
+        </div>
+      </div>
+      <table><thead><tr><th>Cto.</th><th>Cliente</th><th></th><th>US$/Per.</th><th>Frec.</th><th>Val.Total</th><th>Lista</th><th>%</th><th>Alta</th><th>Mes Nº</th><th>¿Fact?</th><th>Com.Venta</th><th>Cobranza</th></tr></thead>
+      <tbody id="commBody"></tbody>
+      <tfoot id="commFoot"></tfoot></table>
+      <div class="info-box info-blue">
+        <strong>Reglas:</strong> Com. Venta = US$/período × (meses ÷ frec.) × % lista — se liquida completa el mes de alta.
+        Cobranza = 1% del valor facturado, solo en meses de facturación según frecuencia.
+        Valor total contrato = US$/período × (meses ÷ frecuencia).
+      </div>
+    </div>
+  </div>
+
+  <!-- EQUIPMENT -->
+  <div id="equipment" class="section">
+    <div class="filters" id="equipFilters"></div>
+    <div class="card">
+      <table><thead><tr><th>Cto.</th><th>Cliente</th><th></th><th>Fecha</th><th>Modelo</th><th>Serie</th><th>Ubicación</th><th>Box</th><th>Serv.</th><th>Total</th><th>Lector</th><th>Obs</th></tr></thead>
+      <tbody id="equipBody"></tbody></table>
+    </div>
+  </div>
+
+  <div class="footer">FD Centro de Gestión Comercial v5.0 · Grupo Docuprint · Datos en tiempo real desde Google Sheets</div>
+</div>
+
+<script>
+const SHEET_BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRDCiEGD3AdPCeJ7OdOn59tvQvDEUkU1Cb7dbm75u_1bCBkZlAdu84oD0FelaWvmAIWuizGmcFafOKo/pub';
+const URLS = {
+  contratos: SHEET_BASE + '?gid=597099696&single=true&output=csv',
+  equipos: SHEET_BASE + '?gid=1589767720&single=true&output=csv'
+};
+
+const COMM_TABLE = [
+  {lista:'Mayor a 4',pct:1.75},{lista:'Lista 4',pct:1.50},{lista:'Lista 3',pct:1.25},
+  {lista:'Lista 2',pct:1.00},{lista:'Lista 1',pct:0.75},{lista:'Lista 0',pct:0.35}
+];
+const FREQ = {1:'Mensual',2:'Bimestral',3:'Trimestral'};
+const COBRANZA = 1.0;
+
+let contracts = [], equipment = [], currentFilter = 'all', equipFilter = 'all';
+
+// Helpers
+const f$ = n => n==null||isNaN(n)?'—':`US$ ${Number(n).toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const daysUntil = d => { try { const t=new Date(d.split('/').reverse().join('-')); return Math.ceil((t-new Date())/864e5); } catch(e) { return 999; }};
+const getPct = l => (COMM_TABLE.find(x=>x.lista===l)||{}).pct||0;
+const badge = (text,cls) => `<span class="badge badge-${cls}">${text}</span>`;
+const alertBadge = d => d<0?badge('Vencido','gray'):d<=90?badge(`⚠ ${d}d`,'red'):d<=180?badge(`${d}d`,'amber'):badge(`${d}d`,'green');
+
+function parseNum(v) { if(!v||v==='—'||v==='') return null; return parseFloat(String(v).replace(/,/g,'.')); }
+
+// Load data
+async function loadData() {
+  document.getElementById('todayDate').textContent = new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('commPeriod').value = new Date().toISOString().slice(0,7);
+
+  try {
+    const [cRes, eRes] = await Promise.all([
+      new Promise((resolve,reject) => Papa.parse(URLS.contratos, {download:true, header:true, skipEmptyLines:true, complete:r=>resolve(r.data), error:reject})),
+      new Promise((resolve,reject) => Papa.parse(URLS.equipos, {download:true, header:true, skipEmptyLines:true, complete:r=>resolve(r.data), error:reject}))
+    ]);
+
+    contracts = cRes.map(r => {
+      const keys = Object.keys(r);
+      return {
+        fuente: r[keys[0]]||'', contrato: r[keys[1]]||'', fantasy: r[keys[2]]||'', razon: r[keys[3]]||'',
+        tipo: r[keys[4]]||'', inicio: r[keys[5]]||'', vto: r[keys[6]]||'', cant: parseNum(r[keys[7]]),
+        dir: r[keys[8]]||'', loc: r[keys[9]]||'', prov: r[keys[10]]||'', cp: r[keys[11]]||'',
+        tel: r[keys[12]]||'', firmante: r[keys[13]]||'',
+        lista: r[keys[14]]||'', usd: parseNum(r[keys[15]]), tipoMed: r[keys[16]]||'',
+        factEn: r[keys[17]]||'', frec: parseNum(r[keys[18]]), meses: parseNum(r[keys[19]]),
+        fechaNuevo: r[keys[20]]||'', plazo: parseNum(r[keys[21]]),
+        copiasBN: parseNum(r[keys[22]]), excBN: parseNum(r[keys[23]]),
+        copiasColor: parseNum(r[keys[24]]), excColor: parseNum(r[keys[25]]),
+        equipos: r[keys[26]]||''
+      };
+    }).filter(c => c.contrato);
+
+    contracts.forEach(c => { c.daysLeft = daysUntil(c.vto); c.commPct = getPct(c.lista); });
+    contracts.sort((a,b) => a.daysLeft - b.daysLeft);
+
+    equipment = eRes.map(r => {
+      const k = Object.keys(r);
+      return { cto:r[k[0]]||'', fantasy:r[k[1]]||'', fuente:r[k[2]]||'', fecha:r[k[3]]||'',
+        modelo:r[k[4]]||'', serie:r[k[5]]||'', ubic:r[k[6]]||'', box:parseNum(r[k[7]]),
+        serv:parseNum(r[k[8]]), total:parseNum(r[k[9]]), lector:r[k[10]]||'', estado:r[k[11]]||'', obs:r[k[12]]||'' };
+    }).filter(e => e.cto);
+
+    renderAll();
+  } catch(err) {
+    document.getElementById('kpis').innerHTML = `<div class="card" style="grid-column:1/-1"><div class="loading">Error cargando datos: ${err.message}<br>Verificá que las hojas estén publicadas en formato CSV.</div></div>`;
+  }
+}
+
+function renderAll() {
+  renderDashboard();
+  renderContracts();
+  renderCommissions();
+  renderEquipment();
+}
+
+// DASHBOARD
+function renderDashboard() {
+  const dss=contracts.filter(c=>c.fuente.includes('Docuprint')), mps=contracts.filter(c=>c.fuente.includes('Docucax'));
+  const alerts=contracts.filter(c=>c.daysLeft>=0&&c.daysLeft<=180);
+  const loaded=contracts.filter(c=>c.usd);
+  const totalUSD=loaded.reduce((s,c)=>s+(c.usd||0),0);
+
+  document.getElementById('kpis').innerHTML = [
+    {l:'Contratos',v:contracts.length,c:'var(--dk)'},
+    {l:'DSS Pantallas',v:dss.length,c:'var(--red)'},
+    {l:'MPS Impresoras',v:mps.length,c:'var(--blue)'},
+    {l:'Alertas ≤180d',v:alerts.length,c:alerts.length>0?'#DC2626':'#059669'},
+  ].map(s=>`<div class="card kpi" style="border-left-color:${s.c}"><div class="label">${s.l}</div><div class="value" style="color:${s.c}">${s.v}</div></div>`).join('');
+
+  const alertRows = contracts.filter(c=>c.daysLeft<=180&&c.daysLeft>=-30);
+  document.getElementById('alertsBody').innerHTML = alertRows.length ? alertRows.map(c=>
+    `<tr class="${c.daysLeft<0?'alert-red':c.daysLeft<=90?'alert-yellow':''}">
+      <td><strong>${c.contrato}</strong></td><td>${c.fantasy}</td>
+      <td>${badge(c.fuente.includes('Docuprint')?'DSS':'MPS',c.fuente.includes('Docuprint')?'dss':'mps')}</td>
+      <td>${c.vto}</td><td>${alertBadge(c.daysLeft)}</td>
+      <td class="usd">${f$(c.usd)}</td><td>${c.frec?FREQ[c.frec]||c.frec:'—'}</td></tr>`
+  ).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">Sin alertas activas</td></tr>';
+
+  document.getElementById('summaryCard').innerHTML = loaded.length?
+    `<div class="card-title">Facturación cargada</div><div style="font-size:13px;color:var(--muted)">${loaded.length} de ${contracts.length} contratos con datos · Facturación total por período: <strong class="usd">${f$(totalUSD)}</strong></div>`:'';
+}
+
+// CONTRACTS
+function renderContracts() {
+  const counts = {all:contracts.length, dss:contracts.filter(c=>c.fuente.includes('Docuprint')).length,
+    mps:contracts.filter(c=>c.fuente.includes('Docucax')).length,
+    alert:contracts.filter(c=>c.daysLeft>=0&&c.daysLeft<=180).length,
+    loaded:contracts.filter(c=>c.usd).length};
+
+  document.getElementById('contractFilters').innerHTML = [['all','Todos'],['dss','DSS'],['mps','MPS'],['alert','Alertas'],['loaded','Con datos']].map(([f,l])=>
+    `<button class="fbtn ${currentFilter===f?'active':''}" onclick="currentFilter='${f}';renderContracts()">${l} (${counts[f]})</button>`).join('');
+
+  let filtered = contracts;
+  if(currentFilter==='dss') filtered=contracts.filter(c=>c.fuente.includes('Docuprint'));
+  if(currentFilter==='mps') filtered=contracts.filter(c=>c.fuente.includes('Docucax'));
+  if(currentFilter==='alert') filtered=contracts.filter(c=>c.daysLeft>=0&&c.daysLeft<=180);
+  if(currentFilter==='loaded') filtered=contracts.filter(c=>c.usd);
+
+  document.getElementById('contractsBody').innerHTML = filtered.map(c=>
+    `<tr><td><strong>${c.contrato}</strong></td><td>${c.fantasy}</td>
+    <td style="font-size:10px;color:var(--muted)">${c.razon}</td>
+    <td>${badge(c.fuente.includes('Docuprint')?'DSS':'MPS',c.fuente.includes('Docuprint')?'dss':'mps')}</td>
+    <td>${c.tipoMed?badge(c.tipoMed,c.tipoMed==='Global'?'purple':'gray'):'—'}</td>
+    <td>${c.vto}</td><td class="usd">${f$(c.usd)}</td>
+    <td>${c.frec?badge(FREQ[c.frec]||c.frec,c.frec===3?'purple':'gray'):'—'}</td>
+    <td style="text-align:center">${c.meses||'—'}</td>
+    <td>${c.copiasBN?c.copiasBN.toLocaleString():'—'}</td>
+    <td>${alertBadge(c.daysLeft)}</td></tr>`
+  ).join('');
+}
+
+// COMMISSIONS
+function renderCommissions() {
+  const period = document.getElementById('commPeriod').value;
+  if(!period) return;
+  const [cy,cm] = period.split('-').map(Number);
+  const MESES = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  const loaded = contracts.filter(c=>c.usd&&c.lista&&c.fechaNuevo);
+  let aV=0, aC=0;
+  const rows = [];
+
+  loaded.forEach(c=>{
+    const alta = c.fechaNuevo;
+    let ay,am;
+    if(alta.includes('/')) { const p=alta.split('/'); am=parseInt(p[1]); ay=parseInt(p[0].length===4?p[0]:p[2]); if(p[0].length<=2){am=parseInt(p[1]);ay=parseInt(p[2]);} }
+    else if(alta.includes('-')) { [ay,am]=alta.split('-').map(Number); }
+    else return;
+    if(isNaN(ay)||isNaN(am)) return;
+    if(new Date(ay,am-1)>new Date(cy,cm-1)) return;
+
+    const frec=c.frec||1, meses=c.plazo||c.meses||0;
+    const nFact=Math.floor(meses/frec);
+    const valTotal=c.usd*nFact;
+    const comVentaTotal=valTotal*(c.commPct/100);
+    const msTr=(cy-ay)*12+(cm-am)+1;
+    const isNew=msTr===1;
+    const vEste=isNew?comVentaTotal:0;
+    const isBilling=((msTr-1)%frec)===0;
+    const cobr=isBilling?c.usd*(COBRANZA/100):0;
+
+    aV+=vEste; aC+=cobr;
+    rows.push({...c,frec,nFact,valTotal,comVentaTotal,msTr,isNew,vEste,isBilling,cobr,altaLabel:`${MESES[am]} ${ay}`});
+  });
+
+  document.getElementById('commBody').innerHTML = rows.length ? rows.map(r=>
+    `<tr style="background:${r.isNew?'#FEF3C7':r.isBilling?'#F0FDF4':'#fff'}">
+    <td><strong>${r.contrato}</strong></td><td>${r.fantasy}</td>
+    <td>${badge(r.fuente.includes('Docuprint')?'DSS':'MPS',r.fuente.includes('Docuprint')?'dss':'mps')}</td>
+    <td class="usd">${f$(r.usd)}</td>
+    <td>${badge(FREQ[r.frec]||r.frec,r.frec===3?'purple':'gray')}</td>
+    <td style="font-size:10px">${f$(r.valTotal)}</td>
+    <td style="font-size:10px">${r.lista}</td>
+    <td class="comm-venta">${r.commPct}%</td>
+    <td style="font-size:10px">${r.altaLabel}</td>
+    <td style="text-align:center">${r.msTr}</td>
+    <td style="text-align:center">${r.isBilling?badge('Sí','green'):'<span style="color:#D1D5DB">No</span>'}</td>
+    <td class="${r.vEste>0?'comm-venta':''}">${r.vEste>0?f$(r.vEste):'—'}</td>
+    <td class="${r.cobr>0?'comm-cobr':''}">${r.cobr>0?f$(r.cobr):'—'}</td></tr>`
+  ).join('') : '<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:20px">Completá "Fecha Nuevo Cto." y "Lista de Precio" en la Google Sheet para calcular comisiones</td></tr>';
+
+  const monthName = `${MESES[cm]} ${cy}`;
+  document.getElementById('commFoot').innerHTML = rows.length ? `
+    <tr class="total-row"><td colspan="11" style="text-align:right">SUBTOTALES ${monthName}</td>
+    <td class="comm-venta">${f$(aV)}</td><td class="comm-cobr">${f$(aC)}</td></tr>
+    <tr class="total-final"><td colspan="11" style="text-align:right;font-size:12px">COMISIÓN TOTAL DEL MES</td>
+    <td colspan="2">${f$(aV+aC)}</td></tr>` : '';
+}
+
+// EQUIPMENT
+function renderEquipment() {
+  const dss=equipment.filter(e=>e.fuente.includes('DSS')), mps=equipment.filter(e=>e.fuente.includes('MPS'));
+  const counts = {all:equipment.length, dss:dss.length, mps:mps.length};
+
+  document.getElementById('equipFilters').innerHTML = [['all','Todos'],['dss','DSS'],['mps','MPS']].map(([f,l])=>
+    `<button class="fbtn ${equipFilter===f?'active':''}" onclick="equipFilter='${f}';renderEquipment()">${l} (${counts[f]})</button>`).join('');
+
+  let filtered = equipment;
+  if(equipFilter==='dss') filtered=dss;
+  if(equipFilter==='mps') filtered=mps;
+
+  document.getElementById('equipBody').innerHTML = filtered.map(e=>
+    `<tr><td><strong>${e.cto}</strong></td><td>${e.fantasy}</td>
+    <td>${badge(e.fuente.includes('DSS')?'DSS':'MPS',e.fuente.includes('DSS')?'dss':'mps')}</td>
+    <td>${e.fecha||'—'}</td><td>${e.modelo}</td>
+    <td style="font-family:monospace;font-size:10px">${e.serie}</td>
+    <td style="font-size:10px">${e.ubic}</td>
+    <td style="text-align:right">${e.box!=null?e.box.toFixed(2):'—'}</td>
+    <td style="text-align:right">${e.serv!=null?e.serv.toFixed(2):'—'}</td>
+    <td style="text-align:right;font-weight:600">${e.total!=null?e.total.toFixed(2):'—'}</td>
+    <td style="font-size:10px">${e.lector||'—'}</td>
+    <td style="font-size:10px;color:var(--muted)">${e.obs||''}</td></tr>`
+  ).join('');
+}
+
+// Navigation
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+}
+
+// Init
+loadData();
+</script>
+</body>
+</html>
